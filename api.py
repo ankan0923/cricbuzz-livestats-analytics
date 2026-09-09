@@ -2,7 +2,11 @@ import requests
 import streamlit as st
 
 
-BASE_URL = "https://cricbuzz-cricket.p.rapidapi.com"
+# =========================================================
+# API CONFIGURATION
+# =========================================================
+
+BASE_URL = "https://crickbuzz-official-apis.p.rapidapi.com"
 
 
 def get_headers():
@@ -12,87 +16,114 @@ def get_headers():
     }
 
 
-def get_live_matches():
-    url = f"{BASE_URL}/matches/v1/live"
+# =========================================================
+# COMMON API REQUEST
+# =========================================================
 
-    response = requests.get(
-        url,
-        headers=get_headers(),
-        timeout=10
-    )
-
-    if response.status_code == 200:
-        return response.json()
-
-    return None
-
-
-def get_upcoming_matches():
-    url = f"{BASE_URL}/matches/v1/upcoming"
-
-    response = requests.get(
-        url,
-        headers=get_headers(),
-        timeout=10
-    )
-
-    if response.status_code == 200:
-        return response.json()
-
-    return None
-
-
-def get_recent_matches():
-    url = f"{BASE_URL}/matches/v1/recent"
-
-    response = requests.get(
-        url,
-        headers=get_headers(),
-        timeout=10
-    )
-
-    if response.status_code == 200:
-        return response.json()
-
-    return None
-
-
-# SCORECARD
-def get_scorecard(match_id):
-
-    url = f"{BASE_URL}/mcenter/v1/{match_id}/hscard"
+def make_api_request(endpoint, params=None):
+    url = f"{BASE_URL}{endpoint}"
 
     try:
-
         response = requests.get(
             url,
             headers=get_headers(),
-            timeout=10
+            params=params,
+            timeout=15
         )
 
-        response.raise_for_status()
+        if response.status_code == 429:
+            st.warning(
+                "API request limit reached. Please try again later."
+            )
+            return None
 
-        return response.json()
+        if response.status_code != 200:
+            st.error(
+                f"API request failed. Status: {response.status_code}"
+            )
+            st.code(response.text[:500])
+            return None
 
-    except requests.RequestException as e:
+        data = response.json()
 
-        print(f"Scorecard API Error: {e}")
+        # Some providers return an error with HTTP 200.
+        if isinstance(data, dict) and "ERROR" in data:
+            error_info = data["ERROR"]
 
+            if isinstance(error_info, dict):
+                message = error_info.get(
+                    "message", "Unknown API error"
+                )
+            else:
+                message = str(error_info)
+
+            st.error(f"API Error: {message}")
+            return None
+
+        return data
+
+    except requests.exceptions.Timeout:
+        st.error("API request timed out. Please try again.")
+        return None
+
+    except requests.exceptions.ConnectionError:
+        st.error("Unable to connect to the cricket API.")
+        return None
+
+    except requests.exceptions.RequestException as error:
+        st.error(f"API request error: {error}")
+        return None
+
+    except ValueError:
+        st.error("The API returned invalid JSON.")
         return None
 
 
-# PLAYERS
-def get_match_team(match_id, team_id):
+# =========================================================
+# LIVE MATCHES
+# =========================================================
 
-    url = f"{BASE_URL}/mcenter/v1/{match_id}/team/{team_id}"
+def get_live_matches():
+    return make_api_request("/matches/live")
 
-    response = requests.get(
-        url,
-        headers=get_headers(),
-        timeout=10
+
+# =========================================================
+# UPCOMING MATCHES
+# =========================================================
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_upcoming_matches():
+    return make_api_request("/matches/upcoming")
+
+
+# =========================================================
+# RECENT MATCHES
+# =========================================================
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_recent_matches():
+    return make_api_request("/matches/recent")
+
+
+# =========================================================
+# SCORECARD
+# =========================================================
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_scorecard(match_id):
+    return make_api_request(
+        f"/match/{match_id}/scorecard",
+        params={"matchID": match_id}
     )
 
-    if response.status_code == 200:
-        return response.json()
 
-    return None
+# =========================================================
+# MATCH SQUADS / PLAYERS
+# =========================================================
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_match_team(match_id, team_id=None):
+    # team_id retained for compatibility with existing pages.
+    return make_api_request(
+        f"/match/{match_id}/squads"
+    )
