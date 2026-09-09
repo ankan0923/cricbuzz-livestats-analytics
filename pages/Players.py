@@ -15,283 +15,10 @@ st.set_page_config(
 )
 
 st.title("👤 Match Players")
-st.caption("Select a live match and team to view the squad.")
 
-
-# =========================================================
-# CASE-INSENSITIVE FIELD READER
-# =========================================================
-
-def get_field(data, *field_names):
-
-    if not isinstance(data, dict):
-        return None
-
-    normalized_data = {
-        str(key).lower().replace("_", ""): value
-        for key, value in data.items()
-    }
-
-    for field_name in field_names:
-
-        normalized_name = (
-            field_name.lower()
-            .replace("_", "")
-        )
-
-        if normalized_name in normalized_data:
-            return normalized_data[normalized_name]
-
-    return None
-
-
-# =========================================================
-# EXTRACT PLAYERS FROM SQUAD RESPONSE
-# =========================================================
-
-def extract_players(
-    value,
-    selected_team_name,
-    selected_team_id,
-    current_team_name=None,
-    current_team_id=None
-):
-
-    extracted_players = []
-
-    if isinstance(value, dict):
-
-        # ---------------------------------------------
-        # DETECT NESTED TEAM INFORMATION
-        # ---------------------------------------------
-
-        team_object = get_field(
-            value,
-            "team"
-        )
-
-        if isinstance(team_object, dict):
-
-            nested_team_name = get_field(
-                team_object,
-                "teamname",
-                "team_name",
-                "name"
-            )
-
-            nested_team_id = get_field(
-                team_object,
-                "teamid",
-                "team_id",
-                "id"
-            )
-
-            if nested_team_name:
-                current_team_name = nested_team_name
-
-            if nested_team_id is not None:
-                current_team_id = nested_team_id
-
-
-        # ---------------------------------------------
-        # DETECT DIRECT TEAM INFORMATION
-        # ---------------------------------------------
-
-        direct_team_name = get_field(
-            value,
-            "teamname",
-            "team_name"
-        )
-
-        direct_team_id = get_field(
-            value,
-            "teamid",
-            "team_id"
-        )
-
-        if direct_team_name:
-            current_team_name = direct_team_name
-
-        if direct_team_id is not None:
-            current_team_id = direct_team_id
-
-
-        # ---------------------------------------------
-        # READ POSSIBLE PLAYER FIELDS
-        # ---------------------------------------------
-
-        player_id = get_field(
-            value,
-            "playerid",
-            "player_id",
-            "id"
-        )
-
-        player_name = get_field(
-            value,
-            "playername",
-            "player_name",
-            "fullname",
-            "full_name",
-            "name"
-        )
-
-        player_role = get_field(
-            value,
-            "playingrole",
-            "playing_role",
-            "role"
-        )
-
-        batting_style = get_field(
-            value,
-            "battingstyle",
-            "batting_style",
-            "batstyle"
-        )
-
-        bowling_style = get_field(
-            value,
-            "bowlingstyle",
-            "bowling_style",
-            "bowlstyle"
-        )
-
-        is_captain = get_field(
-            value,
-            "iscaptain",
-            "is_captain",
-            "captain"
-        )
-
-        is_keeper = get_field(
-            value,
-            "iskeeper",
-            "is_keeper",
-            "keeper"
-        )
-
-
-        # ---------------------------------------------
-        # EXCLUDE TEAM OBJECTS
-        # ---------------------------------------------
-
-        is_team_object = (
-            get_field(
-                value,
-                "teamname",
-                "team_name",
-                "teamsname",
-                "teamid",
-                "team_id"
-            )
-            is not None
-        )
-
-
-        # ---------------------------------------------
-        # IDENTIFY PLAYER OBJECT
-        # ---------------------------------------------
-
-        is_player = (
-            player_id is not None
-            and player_name is not None
-            and not is_team_object
-        )
-
-
-        if is_player:
-
-            team_name_matches = (
-                current_team_name is None
-                or str(current_team_name).lower()
-                == str(selected_team_name).lower()
-            )
-
-            team_id_matches = (
-                current_team_id is None
-                or str(current_team_id)
-                == str(selected_team_id)
-            )
-
-
-            if team_name_matches and team_id_matches:
-
-                extracted_players.append(
-                    {
-                        "Player ID":
-                            player_id,
-
-                        "Player Name":
-                            player_name,
-
-                        "Role":
-                            player_role
-                            or "Unknown",
-
-                        "Batting Style":
-                            batting_style
-                            or "-",
-
-                        "Bowling Style":
-                            bowling_style
-                            or "-",
-
-                        "Team":
-                            current_team_name
-                            or selected_team_name,
-
-                        "Captain":
-                            "Yes"
-                            if is_captain
-                            else "No",
-
-                        "Wicketkeeper":
-                            "Yes"
-                            if is_keeper
-                            else "No"
-                    }
-                )
-
-
-        # ---------------------------------------------
-        # SEARCH ALL NESTED VALUES
-        # ---------------------------------------------
-
-        for nested_value in value.values():
-
-            if isinstance(
-                nested_value,
-                (dict, list)
-            ):
-
-                extracted_players.extend(
-                    extract_players(
-                        nested_value,
-                        selected_team_name,
-                        selected_team_id,
-                        current_team_name,
-                        current_team_id
-                    )
-                )
-
-
-    elif isinstance(value, list):
-
-        for item in value:
-
-            extracted_players.extend(
-                extract_players(
-                    item,
-                    selected_team_name,
-                    selected_team_id,
-                    current_team_name,
-                    current_team_id
-                )
-            )
-
-
-    return extracted_players
+st.caption(
+    "Select a live match and team to view the squad."
+)
 
 
 # =========================================================
@@ -434,7 +161,7 @@ if not match_options:
 
 
 # =========================================================
-# MATCH SELECTION
+# SELECT MATCH
 # =========================================================
 
 selected_match = st.selectbox(
@@ -454,7 +181,7 @@ match_id = selected_match_data[
 
 
 # =========================================================
-# TEAM SELECTION
+# SELECT TEAM
 # =========================================================
 
 team_options = {
@@ -511,7 +238,7 @@ with column3:
 
 
 # =========================================================
-# LOAD PLAYERS
+# GET PLAYERS
 # =========================================================
 
 if st.button(
@@ -524,13 +251,13 @@ if st.button(
         "Loading squad information..."
     ):
 
-        player_data = get_match_team(
+        squad_data = get_match_team(
             match_id,
             team_id
         )
 
 
-    if not player_data:
+    if not squad_data:
 
         st.error(
             "Unable to load squad information."
@@ -540,14 +267,168 @@ if st.button(
 
 
     # =====================================================
+    # FIND SELECTED TEAM SECTION
+    # =====================================================
+
+    selected_team_section = None
+    api_team_name = selected_team
+
+
+    for team_key in [
+        "team1",
+        "team2"
+    ]:
+
+        team_section = squad_data.get(
+            team_key,
+            {}
+        )
+
+        team_information = team_section.get(
+            "team",
+            {}
+        )
+
+        api_team_id = team_information.get(
+            "teamid"
+        )
+
+
+        if str(api_team_id) == str(team_id):
+
+            selected_team_section = team_section
+
+            api_team_name = team_information.get(
+                "teamname",
+                selected_team
+            )
+
+            break
+
+
+    # =====================================================
+    # CHECK SELECTED TEAM
+    # =====================================================
+
+    if selected_team_section is None:
+
+        st.warning(
+            "The selected team was not found "
+            "inside the squad response."
+        )
+
+        with st.expander(
+            "📄 View Raw Squad Response",
+            expanded=True
+        ):
+
+            st.json(squad_data)
+
+        st.stop()
+
+
+    # =====================================================
     # EXTRACT PLAYERS
     # =====================================================
 
-    players_list = extract_players(
-        player_data,
-        selected_team,
-        team_id
+    players_list = []
+
+
+    player_groups = selected_team_section.get(
+        "players",
+        []
     )
+
+
+    for player_group in player_groups:
+
+        if not isinstance(
+            player_group,
+            dict
+        ):
+            continue
+
+
+        group_players = player_group.get(
+            "player",
+            []
+        )
+
+
+        for player in group_players:
+
+            if not isinstance(
+                player,
+                dict
+            ):
+                continue
+
+
+            player_id = player.get(
+                "id"
+            )
+
+            player_name = player.get(
+                "name"
+            )
+
+
+            if not player_id or not player_name:
+                continue
+
+
+            players_list.append(
+                {
+                    "Player ID":
+                        player_id,
+
+                    "Player Name":
+                        player_name,
+
+                    "Role":
+                        player.get(
+                            "role",
+                            "Unknown"
+                        ),
+
+                    "Batting Style":
+                        player.get(
+                            "battingStyle",
+                            "-"
+                        )
+                        or "-",
+
+                    "Bowling Style":
+                        player.get(
+                            "bowlingStyle",
+                            "-"
+                        )
+                        or "-",
+
+                    "Team":
+                        api_team_name,
+
+                    "Captain":
+                        (
+                            "Yes"
+                            if player.get(
+                                "captain",
+                                False
+                            )
+                            else "No"
+                        ),
+
+                    "Wicketkeeper":
+                        (
+                            "Yes"
+                            if player.get(
+                                "keeper",
+                                False
+                            )
+                            else "No"
+                        )
+                }
+            )
 
 
     # =====================================================
@@ -559,16 +440,9 @@ if st.button(
 
     for player in players_list:
 
-        unique_key = (
-            player.get("Player ID")
-            or player.get("Player Name")
-        )
-
-        if unique_key is not None:
-
-            unique_players[
-                str(unique_key)
-            ] = player
+        unique_players[
+            str(player["Player ID"])
+        ] = player
 
 
     players_list = list(
@@ -577,22 +451,24 @@ if st.button(
 
 
     # =====================================================
-    # HANDLE EMPTY RESULT
+    # HANDLE EMPTY PLAYER LIST
     # =====================================================
 
     if not players_list:
 
         st.warning(
-            "Squad data was returned, but player records "
-            "could not be identified."
+            "No player records were found "
+            "for the selected team."
         )
 
         with st.expander(
-            "📄 View Raw Squad Response",
+            "📄 View Selected Team Response",
             expanded=True
         ):
 
-            st.json(player_data)
+            st.json(
+                selected_team_section
+            )
 
         st.stop()
 
@@ -608,12 +484,12 @@ if st.button(
 
     st.success(
         f"{len(player_df)} players loaded "
-        f"for {selected_team}."
+        f"for {api_team_name}."
     )
 
 
     # =====================================================
-    # ROLE COUNTS
+    # PLAYER ROLE COUNTS
     # =====================================================
 
     role_series = (
@@ -627,7 +503,7 @@ if st.button(
     batter_count = (
         role_series
         .str.contains(
-            r"batsman|batter",
+            r"batter|batsman",
             regex=True
         )
         .sum()
@@ -655,8 +531,9 @@ if st.button(
 
     wicketkeeper_count = (
         (
-            role_series.str.contains(
-                r"wicket.?keeper|wk",
+            role_series
+            .str.contains(
+                r"wk|wicket.?keeper",
                 regex=True
             )
         )
@@ -715,7 +592,7 @@ if st.button(
     # =====================================================
 
     st.subheader(
-        f"🏏 {selected_team} Squad"
+        f"🏏 {api_team_name} Squad"
     )
 
 
@@ -752,7 +629,7 @@ if st.button(
 
 
     # =====================================================
-    # CSV DOWNLOAD
+    # DOWNLOAD CSV
     # =====================================================
 
     csv_data = (
@@ -763,7 +640,7 @@ if st.button(
 
 
     safe_team_name = (
-        selected_team
+        api_team_name
         .replace(" ", "_")
         .lower()
     )
@@ -780,7 +657,7 @@ if st.button(
 
 
     # =====================================================
-    # RAW API RESPONSE
+    # RAW RESPONSE
     # =====================================================
 
     with st.expander(
@@ -788,5 +665,5 @@ if st.button(
     ):
 
         st.json(
-            player_data
+            squad_data
         )
