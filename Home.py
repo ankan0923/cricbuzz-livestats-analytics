@@ -240,43 +240,36 @@ live_data = {}
 response = None
 
 try:
-
     response = requests.get(
         f"{BASE_URL}/matches/v1/live",
         headers=headers,
         timeout=10
     )
 
-    if response.status_code == 200:
+    # Temporary debugging
+    st.write("API Status:", response.status_code)
 
+    if response.status_code == 200:
         live_data = response.json()
 
-        for match_type in live_data.get(
-            "typeMatches",
-            []
-        ):
-
-            for series in match_type.get(
-                "seriesMatches",
-                []
-            ):
-
-                wrapper = series.get(
-                    "seriesAdWrapper"
-                )
+        for match_type in live_data.get("typeMatches", []):
+            for series in match_type.get("seriesMatches", []):
+                wrapper = series.get("seriesAdWrapper")
 
                 if wrapper:
-
                     live_matches_count += len(
-                        wrapper.get(
-                            "matches",
-                            []
-                        )
+                        wrapper.get("matches", [])
                     )
 
-except Exception:
+    else:
+        st.error("Live API request failed.")
+        st.write("API Response:", response.text[:500])
 
-    live_matches_count = 0
+except requests.exceptions.RequestException as e:
+    st.error(f"API connection error: {e}")
+
+except Exception as e:
+    st.error(f"Unexpected API error: {e}")
 
 
 # =========================================================
