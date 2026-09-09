@@ -228,9 +228,10 @@ def get_value(df):
 # LIVE API
 # =========================================================
 
-BASE_URL = "https://crickbuzz-official-apis.p.rapidapi.com"
+BASE_URL = "https://cricbuzz-cricket.p.rapidapi.com"
 
 headers = {
+        "Content-Type": "application/json",
     "X-RapidAPI-Key": st.secrets["API_KEY"],
     "X-RapidAPI-Host": st.secrets["API_HOST"]
 }
@@ -241,9 +242,9 @@ response = None
 
 try:
     response = requests.get(
-        f"{BASE_URL}/matches/live",
+        f"{BASE_URL}/matches/v1/live",
         headers=headers,
-        timeout=10
+        timeout=15
     )
 
     st.write("API Status:", response.status_code)
