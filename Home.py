@@ -240,7 +240,7 @@ response = None
 
 try:
     response = requests.get(
-        f"{BASE_URL}/matches/v1/live",
+        f"{BASE_URL}/matches/list",
         headers=headers,
         timeout=10
     )
