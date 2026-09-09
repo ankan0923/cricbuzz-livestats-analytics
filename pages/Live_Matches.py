@@ -1,67 +1,97 @@
 import streamlit as st
-import pandas as pd
 from api import get_live_matches
 
-st.set_page_config(page_title="Live Matches", page_icon="🏏")
+# =========================================================
+# PAGE CONFIGURATION
+# =========================================================
+
+st.set_page_config(
+    page_title="Live Matches",
+    page_icon="🏏",
+    layout="wide")
+
+
+# =========================================================
+# PAGE TITLE
+# =========================================================
 
 st.title("🔴 Live Cricket Matches")
-st.caption("Real-time live match updates from Cricbuzz API")
 
-# ---------------- Refresh Button ----------------
-refresh = st.button("🔄 Refresh Live Matches")
+st.caption(
+    "Real-time live match updates from Crickbuzz API"
+)
 
-data = get_live_matches()
 
-if not data:
+# =========================================================
+# REFRESH BUTTON
+# =========================================================
+
+if st.button("🔄 Refresh Live Matches"):
+    st.rerun()
+
+
+# =========================================================
+# FETCH LIVE MATCHES
+# =========================================================
+
+with st.spinner("Loading live matches..."):
+    data = get_live_matches()
+
+
+if data is None:
     st.error("Unable to load live matches from API.")
     st.stop()
 
+
+if not isinstance(data, dict):
+    st.error("The API returned an unexpected response.")
+    st.json(data)
+    st.stop()
+
+
+# =========================================================
+# VALIDATE RESPONSE STRUCTURE
+# =========================================================
+
+if "typeMatches" not in data:
+    st.warning(
+        "The API returned data, but its structure is different "
+        "from the expected Cricbuzz match format."
+    )
+
+    st.write("Response keys:", list(data.keys()))
+
+    with st.expander("View API Response"):
+        st.json(data)
+
+    st.stop()
+
+
 type_matches = data.get("typeMatches", [])
 
-# ---------------- Collect KPI Data ----------------
+
+if not type_matches:
+    st.warning("No live matches are available right now.")
+    st.stop()
+
+
+# =========================================================
+# COLLECT KPI DATA
+# =========================================================
+
 total_matches = 0
 total_series = 0
+
 formats = set()
 teams = set()
 
-for match_type in type_matches:
-
-    formats.add(match_type.get("matchType", ""))
-
-    for series in match_type.get("seriesMatches", []):
-
-        wrapper = series.get("seriesAdWrapper")
-
-        if wrapper:
-            total_series += 1
-
-            for match in wrapper.get("matches", []):
-
-                total_matches += 1
-
-                info = match.get("matchInfo", {})
-
-                teams.add(info.get("team1", {}).get("teamName", ""))
-                teams.add(info.get("team2", {}).get("teamName", ""))
-
-# ---------------- KPI Section ----------------
-
-k1, k2, k3, k4 = st.columns(4)
-
-k1.metric("🏏 Live Matches", total_matches)
-k2.metric("📺 Live Series", total_series)
-k3.metric("🎯 Match Formats", len(formats))
-k4.metric("🌍 Teams Playing", len(teams))
-
-st.divider()
-
-# =========================================================
-# LIVE MATCHES
-# =========================================================
 
 for match_type in type_matches:
 
-    st.markdown(f"## 🏆 {match_type.get('matchType','Unknown')}")
+    match_format = match_type.get("matchType")
+
+    if match_format:
+        formats.add(match_format)
 
     for series in match_type.get("seriesMatches", []):
 
@@ -70,55 +100,199 @@ for match_type in type_matches:
         if not wrapper:
             continue
 
-        st.markdown(f"### 📌 {wrapper.get('seriesName','Unknown Series')}")
+        total_series += 1
 
         for match in wrapper.get("matches", []):
+
+            total_matches += 1
+
+            info = match.get("matchInfo", {})
+
+            team1 = (
+                info.get("team1", {})
+                .get("teamName")
+            )
+
+            team2 = (
+                info.get("team2", {})
+                .get("teamName")
+            )
+
+            if team1:
+                teams.add(team1)
+
+            if team2:
+                teams.add(team2)
+
+
+# =========================================================
+# KPI SECTION
+# =========================================================
+
+k1, k2, k3, k4 = st.columns(4)
+
+with k1:
+    st.metric("🏏 Live Matches", total_matches)
+
+with k2:
+    st.metric("📺 Live Series", total_series)
+
+with k3:
+    st.metric("🎯 Match Formats", len(formats))
+
+with k4:
+    st.metric("🌍 Teams Playing", len(teams))
+
+
+st.divider()
+
+
+# =========================================================
+# DISPLAY LIVE MATCHES
+# =========================================================
+
+for match_type in type_matches:
+
+    match_format = match_type.get(
+        "matchType",
+        "Unknown Format"
+    )
+
+    st.markdown(f"## 🏆 {match_format}")
+
+    series_matches = match_type.get(
+        "seriesMatches",
+        []
+    )
+
+    for series in series_matches:
+
+        wrapper = series.get("seriesAdWrapper")
+
+        if not wrapper:
+            continue
+
+        series_name = wrapper.get(
+            "seriesName",
+            "Unknown Series"
+        )
+
+        st.markdown(f"### 📌 {series_name}")
+
+        matches = wrapper.get("matches", [])
+
+        for match in matches:
 
             info = match.get("matchInfo", {})
             score = match.get("matchScore", {})
 
-            team1 = info.get("team1", {}).get("teamName", "Team 1")
-            team2 = info.get("team2", {}).get("teamName", "Team 2")
+            # -----------------------------------------
+            # MATCH INFORMATION
+            # -----------------------------------------
 
-            venue = info.get("venueInfo", {}).get("ground", "Unknown Venue")
-            city = info.get("venueInfo", {}).get("city", "")
+            team1 = (
+                info.get("team1", {})
+                .get("teamName", "Team 1")
+            )
 
-            status = info.get("status", "Status Not Available")
+            team2 = (
+                info.get("team2", {})
+                .get("teamName", "Team 2")
+            )
 
-            match_desc = info.get("matchDesc", "")
-            state = info.get("state", "")
-            toss = info.get("tossResults", {}).get("tossWinnerName", "-")
+            venue_info = info.get("venueInfo", {})
 
-            team1_score = score.get("team1Score", {}).get("inngs1", {})
-            team2_score = score.get("team2Score", {}).get("inngs1", {})
+            venue = venue_info.get(
+                "ground",
+                "Unknown Venue"
+            )
+
+            city = venue_info.get("city", "")
+
+            match_desc = info.get(
+                "matchDesc",
+                "Match"
+            )
+
+            state = str(
+                info.get("state", "Unknown")
+            )
+
+            status = info.get(
+                "status",
+                "Status not available"
+            )
+
+            toss = (
+                info.get("tossResults", {})
+                .get("tossWinnerName", "-")
+            )
+
+            # -----------------------------------------
+            # TEAM 1 SCORE
+            # -----------------------------------------
+
+            team1_score = (
+                score.get("team1Score", {})
+                .get("inngs1", {})
+            )
 
             t1_runs = team1_score.get("runs", "-")
-            t1_wkts = team1_score.get("wickets", "-")
+            t1_wickets = team1_score.get("wickets", "-")
             t1_overs = team1_score.get("overs", "-")
 
+            # -----------------------------------------
+            # TEAM 2 SCORE
+            # -----------------------------------------
+
+            team2_score = (
+                score.get("team2Score", {})
+                .get("inngs1", {})
+            )
+
             t2_runs = team2_score.get("runs", "-")
-            t2_wkts = team2_score.get("wickets", "-")
+            t2_wickets = team2_score.get("wickets", "-")
             t2_overs = team2_score.get("overs", "-")
 
-            # -------- Match Card --------
+            # -----------------------------------------
+            # MATCH CARD
+            # -----------------------------------------
 
             with st.container(border=True):
 
-                st.markdown(f"### 🏏 {team1} vs {team2}")
+                st.markdown(
+                    f"### 🏏 {team1} vs {team2}"
+                )
 
-                c1, c2 = st.columns([3,2])
+                info_col, state_col = st.columns([3, 2])
 
-                with c1:
+                with info_col:
 
                     st.write(f"**Match:** {match_desc}")
-                    st.write(f"**Venue:** {venue}, {city}")
 
-                with c2:
+                    if city:
+                        st.write(
+                            f"**Venue:** {venue}, {city}"
+                        )
+                    else:
+                        st.write(
+                            f"**Venue:** {venue}"
+                        )
 
-                    if state == "In Progress":
+                with state_col:
+
+                    state_lower = state.lower()
+
+                    if (
+                        "progress" in state_lower
+                        or "live" in state_lower
+                    ):
                         st.success("🟢 LIVE")
 
-                    elif state == "Complete":
+                    elif (
+                        "complete" in state_lower
+                        or "finished" in state_lower
+                    ):
                         st.error("🔴 COMPLETED")
 
                     else:
@@ -126,27 +300,47 @@ for match_type in type_matches:
 
                 st.info(status)
 
-                # ---------------- SCOREBOARD ----------------
+                # -------------------------------------
+                # SCOREBOARD
+                # -------------------------------------
 
-                s1, s2 = st.columns(2)
+                score_col1, score_col2 = st.columns(2)
 
-                with s1:
+                with score_col1:
 
-                    st.markdown(f"### 🇮🇳 {team1}")
+                    st.markdown(f"### {team1}")
+
+                    if t1_wickets == "-":
+                        team1_display = str(t1_runs)
+                    else:
+                        team1_display = (
+                            f"{t1_runs}/{t1_wickets}"
+                        )
+
                     st.metric(
                         "Score",
-                        f"{t1_runs}/{t1_wkts}"
+                        team1_display
                     )
-                    st.caption(f"Overs : {t1_overs}")
 
-                with s2:
+                    st.caption(f"Overs: {t1_overs}")
 
-                    st.markdown(f"### 🇦🇺 {team2}")
+                with score_col2:
+
+                    st.markdown(f"### {team2}")
+
+                    if t2_wickets == "-":
+                        team2_display = str(t2_runs)
+                    else:
+                        team2_display = (
+                            f"{t2_runs}/{t2_wickets}"
+                        )
+
                     st.metric(
                         "Score",
-                        f"{t2_runs}/{t2_wkts}"
+                        team2_display
                     )
-                    st.caption(f"Overs : {t2_overs}")
+
+                    st.caption(f"Overs: {t2_overs}")
 
                 st.write(f"**Toss Winner:** {toss}")
 
