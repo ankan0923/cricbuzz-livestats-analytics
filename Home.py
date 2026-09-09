@@ -239,11 +239,15 @@ live_data = {}
 response = None
 
 try:
-    response = requests.get(
-        f"{BASE_URL}/matches/list",
-        headers=headers,
-        timeout=10
-    )
+  response = requests.get(
+    f"{BASE_URL}/rankings/team",
+    headers=headers,
+    params={
+        "formatType": "t20",
+        "women": 1
+    },
+    timeout=10
+)
 
     # Temporary debugging
     st.write("API Status:", response.status_code)
