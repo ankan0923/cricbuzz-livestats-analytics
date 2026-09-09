@@ -231,6 +231,7 @@ A typical `requirements.txt` for this project includes:
 streamlit
 pandas
 requests
+plotly
 ```
 
 SQLite is included with Python through the built-in `sqlite3` module. Add any additional libraries used by your visualization code to the requirements file.
