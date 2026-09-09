@@ -247,8 +247,17 @@ if st.button(
     use_container_width=True
 ):
 
+    if team_id is None:
+
+        st.error(
+            "Team ID is unavailable for this match."
+        )
+
+        st.stop()
+
+
     with st.spinner(
-        "Loading squad information..."
+        "Loading player information..."
     ):
 
         squad_data = get_match_team(
@@ -257,85 +266,31 @@ if st.button(
         )
 
 
+    # =====================================================
+    # VALIDATE API RESPONSE
+    # =====================================================
+
     if not squad_data:
 
         st.error(
-            "Unable to load squad information."
+            "Unable to load players from the API."
         )
-
-        st.stop()
-
-
-    # =====================================================
-    # FIND SELECTED TEAM SECTION
-    # =====================================================
-
-    selected_team_section = None
-    api_team_name = selected_team
-
-
-    for team_key in [
-        "team1",
-        "team2"
-    ]:
-
-        team_section = squad_data.get(
-            team_key,
-            {}
-        )
-
-        team_information = team_section.get(
-            "team",
-            {}
-        )
-
-        api_team_id = team_information.get(
-            "teamid"
-        )
-
-
-        if str(api_team_id) == str(team_id):
-
-            selected_team_section = team_section
-
-            api_team_name = team_information.get(
-                "teamname",
-                selected_team
-            )
-
-            break
-
-
-    # =====================================================
-    # CHECK SELECTED TEAM
-    # =====================================================
-
-    if selected_team_section is None:
-
-        st.warning(
-            "The selected team was not found "
-            "inside the squad response."
-        )
-
-        with st.expander(
-            "📄 View Raw Squad Response",
-            expanded=True
-        ):
-
-            st.json(squad_data)
 
         st.stop()
 
 
     # =====================================================
     # EXTRACT PLAYERS
+    #
+    # API structure:
+    # player -> list -> player -> list
     # =====================================================
 
     players_list = []
 
 
-    player_groups = selected_team_section.get(
-        "players",
+    player_groups = squad_data.get(
+        "player",
         []
     )
 
@@ -353,6 +308,13 @@ if st.button(
             "player",
             []
         )
+
+
+        if not isinstance(
+            group_players,
+            list
+        ):
+            continue
 
 
         for player in group_players:
@@ -389,7 +351,8 @@ if st.button(
                         player.get(
                             "role",
                             "Unknown"
-                        ),
+                        )
+                        or "Unknown",
 
                     "Batting Style":
                         player.get(
@@ -406,7 +369,7 @@ if st.button(
                         or "-",
 
                     "Team":
-                        api_team_name,
+                        selected_team,
 
                     "Captain":
                         (
@@ -432,7 +395,7 @@ if st.button(
 
 
     # =====================================================
-    # REMOVE DUPLICATES
+    # REMOVE DUPLICATE PLAYERS
     # =====================================================
 
     unique_players = {}
@@ -451,23 +414,23 @@ if st.button(
 
 
     # =====================================================
-    # HANDLE EMPTY PLAYER LIST
+    # HANDLE EMPTY RESULT
     # =====================================================
 
     if not players_list:
 
         st.warning(
-            "No player records were found "
-            "for the selected team."
+            "The API returned team data, but no player "
+            "records were found."
         )
 
         with st.expander(
-            "📄 View Selected Team Response",
+            "📄 View Raw Team Response",
             expanded=True
         ):
 
             st.json(
-                selected_team_section
+                squad_data
             )
 
         st.stop()
@@ -484,12 +447,12 @@ if st.button(
 
     st.success(
         f"{len(player_df)} players loaded "
-        f"for {api_team_name}."
+        f"for {selected_team}."
     )
 
 
     # =====================================================
-    # PLAYER ROLE COUNTS
+    # ROLE COUNTS
     # =====================================================
 
     role_series = (
@@ -546,7 +509,7 @@ if st.button(
 
 
     # =====================================================
-    # KPI SECTION
+    # KPI CARDS
     # =====================================================
 
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
@@ -592,7 +555,7 @@ if st.button(
     # =====================================================
 
     st.subheader(
-        f"🏏 {api_team_name} Squad"
+        f"🏏 {selected_team} Squad"
     )
 
 
@@ -640,7 +603,7 @@ if st.button(
 
 
     safe_team_name = (
-        api_team_name
+        selected_team
         .replace(" ", "_")
         .lower()
     )
@@ -657,11 +620,11 @@ if st.button(
 
 
     # =====================================================
-    # RAW RESPONSE
+    # RAW API RESPONSE
     # =====================================================
 
     with st.expander(
-        "📄 View Raw Squad Response"
+        "📄 View Raw Team Response"
     ):
 
         st.json(
