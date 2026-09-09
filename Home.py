@@ -228,7 +228,8 @@ def get_value(df):
 # LIVE API
 # =========================================================
 
-BASE_URL = "https://cricbuzz-official-apis.p.rapidapi.com"
+BASE_URL = "https://crickbuzz-official-apis.p.rapidapi.com"
+
 headers = {
     "X-RapidAPI-Key": st.secrets["API_KEY"],
     "X-RapidAPI-Host": st.secrets["API_HOST"]
@@ -239,17 +240,12 @@ live_data = {}
 response = None
 
 try:
-  response = requests.get(
-    f"{BASE_URL}/rankings/team",
-    headers=headers,
-    params={
-        "formatType": "t20",
-        "women": 1
-    },
-    timeout=10
-)
+    response = requests.get(
+        f"{BASE_URL}/matches/live",
+        headers=headers,
+        timeout=10
+    )
 
-    # Temporary debugging
     st.write("API Status:", response.status_code)
 
     if response.status_code == 200:
@@ -264,15 +260,15 @@ try:
                         wrapper.get("matches", [])
                     )
 
+    elif response.status_code == 429:
+        st.warning("API request limit reached.")
+
     else:
-        st.error("Live API request failed.")
-        st.write("API Response:", response.text[:500])
+        st.error(f"API request failed: {response.status_code}")
+        st.code(response.text[:500])
 
 except requests.exceptions.RequestException as e:
     st.error(f"API connection error: {e}")
-
-except Exception as e:
-    st.error(f"Unexpected API error: {e}")
 
 
 # =========================================================
