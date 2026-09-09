@@ -228,8 +228,7 @@ def get_value(df):
 # LIVE API
 # =========================================================
 
-BASE_URL = "https://cricbuzz-cricket.p.rapidapi.com"
-
+BASE_URL = "https://cricbuzz-official-apis.p.rapidapi.com"
 headers = {
     "X-RapidAPI-Key": st.secrets["API_KEY"],
     "X-RapidAPI-Host": st.secrets["API_HOST"]
