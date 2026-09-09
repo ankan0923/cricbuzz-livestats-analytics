@@ -1,12 +1,11 @@
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
 from api import get_live_matches, get_match_team
 
 
-
 # =========================================================
-# PAGE CONFIG
+# PAGE CONFIGURATION
 # =========================================================
 
 st.set_page_config(
@@ -23,17 +22,176 @@ st.caption(
 
 
 # =========================================================
+# PLAYER EXTRACTION FUNCTION
+# =========================================================
+
+def extract_players(
+    value,
+    selected_team_name,
+    selected_team_id,
+    current_team_name=None,
+    current_team_id=None
+):
+    """
+    Recursively extracts players from different squad
+    response structures.
+    """
+
+    extracted_players = []
+
+    if isinstance(value, dict):
+
+        # Detect team information in the current object
+        detected_team_name = (
+            value.get("teamName")
+            or value.get("teamname")
+            or value.get("team_name")
+            or current_team_name
+        )
+
+        detected_team_id = (
+            value.get("teamId")
+            or value.get("team_id")
+            or current_team_id
+        )
+
+        # Possible player fields
+        player_id = (
+            value.get("id")
+            or value.get("playerId")
+            or value.get("player_id")
+        )
+
+        player_name = (
+            value.get("name")
+            or value.get("playerName")
+            or value.get("fullName")
+        )
+
+        player_role = (
+            value.get("role")
+            or value.get("playingRole")
+            or value.get("playing_role")
+        )
+
+        # A player must have a name and a player-related field
+        is_player = (
+            player_name
+            and (
+                player_role is not None
+                or "battingStyle" in value
+                or "bowlingStyle" in value
+                or "isCaptain" in value
+                or "isKeeper" in value
+            )
+        )
+
+        if is_player:
+
+            player_team_name = (
+                value.get("teamname")
+                or value.get("teamName")
+                or detected_team_name
+            )
+
+            player_team_id = (
+                value.get("teamId")
+                or value.get("team_id")
+                or detected_team_id
+            )
+
+            team_name_matches = (
+                player_team_name is None
+                or str(player_team_name).lower()
+                == str(selected_team_name).lower()
+            )
+
+            team_id_matches = (
+                player_team_id is None
+                or str(player_team_id)
+                == str(selected_team_id)
+            )
+
+            if team_name_matches and team_id_matches:
+
+                extracted_players.append(
+                    {
+                        "Player ID": player_id,
+                        "Player Name": player_name,
+                        "Role": player_role or "Unknown",
+                        "Team": (
+                            player_team_name
+                            or selected_team_name
+                        ),
+                        "Captain": (
+                            "Yes"
+                            if value.get("isCaptain")
+                            else "No"
+                        ),
+                        "Wicketkeeper": (
+                            "Yes"
+                            if value.get("isKeeper")
+                            else "No"
+                        )
+                    }
+                )
+
+        # Recursively inspect nested objects
+        for nested_value in value.values():
+
+            if isinstance(
+                nested_value,
+                (dict, list)
+            ):
+
+                extracted_players.extend(
+                    extract_players(
+                        nested_value,
+                        selected_team_name,
+                        selected_team_id,
+                        detected_team_name,
+                        detected_team_id
+                    )
+                )
+
+    elif isinstance(value, list):
+
+        for item in value:
+
+            extracted_players.extend(
+                extract_players(
+                    item,
+                    selected_team_name,
+                    selected_team_id,
+                    current_team_name,
+                    current_team_id
+                )
+            )
+
+    return extracted_players
+
+
+# =========================================================
+# REFRESH BUTTON
+# =========================================================
+
+if st.button("🔄 Refresh Match Data"):
+
+    st.cache_data.clear()
+    st.rerun()
+
+
+# =========================================================
 # GET LIVE MATCHES
 # =========================================================
 
-data = get_live_matches()
+with st.spinner("Loading live matches..."):
+    live_data = get_live_matches()
 
-if not data:
 
-    st.error(
-        "Unable to load live matches."
-    )
+if not live_data:
 
+    st.error("Unable to load live matches.")
     st.stop()
 
 
@@ -43,7 +201,8 @@ if not data:
 
 match_options = {}
 
-for match_type in data.get(
+
+for match_type in live_data.get(
     "typeMatches",
     []
 ):
@@ -115,20 +274,12 @@ for match_type in data.get(
 
             match_options[label] = {
                 "match_id": match_id,
-                "team1_id": team1.get(
-                    "teamId"
-                ),
+                "team1_id": team1.get("teamId"),
                 "team1_name": team1_name,
-                "team2_id": team2.get(
-                    "teamId"
-                ),
+                "team2_id": team2.get("teamId"),
                 "team2_name": team2_name
             }
 
-
-# =========================================================
-# CHECK MATCHES
-# =========================================================
 
 if not match_options:
 
@@ -140,42 +291,38 @@ if not match_options:
 
 
 # =========================================================
-# MATCH DROPDOWN
+# MATCH SELECTION
 # =========================================================
 
 selected_match = st.selectbox(
     "Choose Match",
-    list(
-        match_options.keys()
-    )
+    list(match_options.keys())
 )
 
-match_data = match_options[
+selected_match_data = match_options[
     selected_match
 ]
 
-match_id = match_data[
+match_id = selected_match_data[
     "match_id"
 ]
 
 
 # =========================================================
-# TEAM DROPDOWN
+# TEAM SELECTION
 # =========================================================
 
 team_options = {
-    match_data["team1_name"]:
-        match_data["team1_id"],
+    selected_match_data["team1_name"]:
+        selected_match_data["team1_id"],
 
-    match_data["team2_name"]:
-        match_data["team2_id"]
+    selected_match_data["team2_name"]:
+        selected_match_data["team2_id"]
 }
 
 selected_team = st.selectbox(
     "Choose Team",
-    list(
-        team_options.keys()
-    )
+    list(team_options.keys())
 )
 
 team_id = team_options[
@@ -189,20 +336,23 @@ team_id = team_options[
 
 col1, col2, col3 = st.columns(3)
 
-col1.metric(
-    "Match ID",
-    match_id
-)
+with col1:
+    st.metric(
+        "Match ID",
+        match_id
+    )
 
-col2.metric(
-    "Selected Team",
-    selected_team
-)
+with col2:
+    st.metric(
+        "Selected Team",
+        selected_team
+    )
 
-col3.metric(
-    "Team ID",
-    team_id
-)
+with col3:
+    st.metric(
+        "Team ID",
+        team_id or "Unavailable"
+    )
 
 
 # =========================================================
@@ -215,18 +365,7 @@ if st.button(
     use_container_width=True
 ):
 
-    if not team_id:
-
-        st.error(
-            "Team ID is not available "
-            "for this match."
-        )
-
-        st.stop()
-
-    with st.spinner(
-        "Loading players..."
-    ):
+    with st.spinner("Loading players..."):
 
         player_data = get_match_team(
             match_id,
@@ -234,14 +373,10 @@ if st.button(
         )
 
 
-    # =====================================================
-    # CHECK API RESPONSE
-    # =====================================================
-
     if not player_data:
 
         st.error(
-            "Unable to load players."
+            "Unable to load squad information."
         )
 
         st.stop()
@@ -251,208 +386,206 @@ if st.button(
     # EXTRACT PLAYERS
     # =====================================================
 
-    players_list = []
-
-    player_groups = player_data.get(
-        "player",
-        []
+    players_list = extract_players(
+        player_data,
+        selected_team,
+        team_id
     )
 
-    for group in player_groups:
 
-        players = group.get(
-            "player",
-            []
+    # Remove duplicate players
+    unique_players = {}
+
+    for player in players_list:
+
+        unique_key = (
+            player.get("Player ID")
+            or player.get("Player Name")
         )
 
-        for player in players:
+        if unique_key:
+            unique_players[
+                str(unique_key)
+            ] = player
 
-            players_list.append(
-                {
-                    "Player ID":
-                        player.get(
-                            "id"
-                        ),
-
-                    "Player Name":
-                        player.get(
-                            "name"
-                        ),
-
-                    "Role":
-                        player.get(
-                            "role"
-                        ),
-
-                    "Team":
-                        player.get(
-                            "teamname"
-                        )
-                }
-            )
+    players_list = list(
+        unique_players.values()
+    )
 
 
     # =====================================================
-    # DISPLAY RESULTS
+    # DISPLAY PLAYERS
     # =====================================================
 
-    if players_list:
-
-        st.success(
-            "Players loaded successfully!"
-        )
-
-        df = pd.DataFrame(
-            players_list
-        )
-
-
-        # =================================================
-        # PLAYER ROLE KPIs
-        # =================================================
-
-        role_series = (
-            df["Role"]
-            .fillna("")
-            .str.lower()
-        )
-
-        batsman_count = (
-            role_series
-            .str.contains(
-                "batsman"
-            )
-            .sum()
-        )
-
-        bowler_count = (
-            role_series
-            .eq(
-                "bowler"
-            )
-            .sum()
-        )
-
-        allrounder_count = (
-            role_series
-            .str.contains(
-                "allrounder"
-            )
-            .sum()
-        )
-
-
-        # =================================================
-        # KPI CARDS
-        # =================================================
-
-        k1, k2, k3 = st.columns(3)
-
-        k1.metric(
-            "🏏 Batsmen",
-            int(
-                batsman_count
-            )
-        )
-
-        k2.metric(
-            "🎯 Bowlers",
-            int(
-                bowler_count
-            )
-        )
-
-        k3.metric(
-            "⚡ All-Rounders",
-            int(
-                allrounder_count
-            )
-        )
-
-
-        st.divider()
-
-
-        # =================================================
-        # PLAYER TABLE
-        # =================================================
-
-        st.subheader(
-            f"🏏 {selected_team} Players"
-        )
-
-        st.dataframe(
-            df,
-            use_container_width=True,
-            hide_index=True
-        )
-
-
-        # =================================================
-        # ROLE SUMMARY
-        # =================================================
-
-        st.subheader(
-            "📊 Squad Role Distribution"
-        )
-
-        role_summary = (
-            df["Role"]
-            .fillna(
-                "Unknown"
-            )
-            .value_counts()
-            .reset_index()
-        )
-
-        role_summary.columns = [
-            "Role",
-            "Players"
-        ]
-
-        st.dataframe(
-            role_summary,
-            use_container_width=True,
-            hide_index=True
-        )
-
-
-        # =================================================
-        # DOWNLOAD CSV
-        # =================================================
-
-        csv = df.to_csv(
-            index=False
-        ).encode(
-            "utf-8"
-        )
-
-        st.download_button(
-            "⬇️ Download Player List",
-            data=csv,
-            file_name=(
-                f"{selected_team}_players.csv"
-            ),
-            mime="text/csv"
-        )
-
-
-        # =================================================
-        # RAW JSON
-        # =================================================
-
-        with st.expander(
-            "📄 View Raw Player JSON"
-        ):
-
-            st.json(
-                player_data
-            )
-
-
-    else:
+    if not players_list:
 
         st.warning(
-            "No players found for "
-            "the selected team."
+            "The API returned squad data, but no players "
+            "could be matched to the selected team."
         )
+
+        with st.expander(
+            "📄 View Raw Squad Response",
+            expanded=True
+        ):
+            st.json(player_data)
+
+        st.stop()
+
+
+    df = pd.DataFrame(
+        players_list
+    )
+
+
+    st.success(
+        f"{len(df)} players loaded for {selected_team}."
+    )
+
+
+    # =====================================================
+    # ROLE COUNTS
+    # =====================================================
+
+    role_series = (
+        df["Role"]
+        .fillna("")
+        .astype(str)
+        .str.lower()
+    )
+
+    batsmen_count = (
+        role_series
+        .str.contains(
+            r"batsman|batter",
+            regex=True
+        )
+        .sum()
+    )
+
+    bowler_count = (
+        role_series
+        .str.contains("bowler")
+        .sum()
+    )
+
+    allrounder_count = (
+        role_series
+        .str.contains(
+            r"all.?rounder",
+            regex=True
+        )
+        .sum()
+    )
+
+    wicketkeeper_count = (
+        (
+            role_series.str.contains(
+                r"wicket.?keeper|wk",
+                regex=True
+            )
+        )
+        | (
+            df["Wicketkeeper"] == "Yes"
+        )
+    ).sum()
+
+
+    # =====================================================
+    # KPI CARDS
+    # =====================================================
+
+    k1, k2, k3, k4 = st.columns(4)
+
+    with k1:
+        st.metric(
+            "🏏 Batters",
+            int(batsmen_count)
+        )
+
+    with k2:
+        st.metric(
+            "🎯 Bowlers",
+            int(bowler_count)
+        )
+
+    with k3:
+        st.metric(
+            "⚡ All-Rounders",
+            int(allrounder_count)
+        )
+
+    with k4:
+        st.metric(
+            "🧤 Wicketkeepers",
+            int(wicketkeeper_count)
+        )
+
+
+    st.divider()
+
+
+    # =====================================================
+    # PLAYER TABLE
+    # =====================================================
+
+    st.subheader(
+        f"🏏 {selected_team} Squad"
+    )
+
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+    # =====================================================
+    # ROLE SUMMARY
+    # =====================================================
+
+    st.subheader(
+        "📊 Squad Role Distribution"
+    )
+
+    role_summary = (
+        df["Role"]
+        .fillna("Unknown")
+        .value_counts()
+        .rename_axis("Role")
+        .reset_index(name="Players")
+    )
+
+    st.dataframe(
+        role_summary,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+    # =====================================================
+    # CSV DOWNLOAD
+    # =====================================================
+
+    csv_data = df.to_csv(
+        index=False
+    ).encode("utf-8")
+
+    st.download_button(
+        "⬇️ Download Player List",
+        data=csv_data,
+        file_name=(
+            f"{selected_team}_players.csv"
+        ),
+        mime="text/csv"
+    )
+
+
+    # =====================================================
+    # RAW API RESPONSE
+    # =====================================================
+
+    with st.expander(
+        "📄 View Raw Squad Response"
+    ):
+        st.json(player_data)
