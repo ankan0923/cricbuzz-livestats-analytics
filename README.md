@@ -10,7 +10,7 @@ The project demonstrates an end-to-end workflow: API integration → data proces
 
 Explore the complete Cricbuzz LiveStats application:
 
-👉 [Open Live Streamlit Dashboard](YOUR_STREAMLIT_APP_URL)
+👉 [Open Live Streamlit Dashboard](https://homepy-i9qq8g4gqhaj7xutnmu64m.streamlit.app/)
 
 The dashboard allows users to explore live and upcoming matches, view detailed scorecards, analyze player and team performance, execute SQL queries, and manage cricket records.
 
